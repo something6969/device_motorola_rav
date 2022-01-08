@@ -1,0 +1,120 @@
+import init.hidl.sensor.rc
+import init.mmi.dtv.rc
+
+service audiopara-sh /vendor/bin/init.audio.specified_para.sh
+#    seclabel u:r:init_hw:s0
+    class core
+    user root
+    oneshot
+
+service capsense_reset /system/vendor/bin/capsense_reset
+   class core
+   user system
+   group system input
+   disabled
+
+on property:sys.boot_completed=1
+    start capsense_reset
+
+on early-init
+   exec u:r:vendor_modprobe:s0 -- /vendor/bin/modprobe -a -d /vendor/lib/modules focaltech_0flash_mmi nova_0flash_mmi himax_v2_mmi_hx83112 himax_v2_mmi
+   insmod /vendor/lib/modules/sx933x_sar.ko
+   insmod /vendor/lib/modules/abov_sar.ko
+   insmod /vendor/lib/modules/sx932x_sar.ko
+   insmod /vendor/lib/modules/aw8695.ko
+   insmod /vendor/lib/modules/tps61280.ko
+   insmod /vendor/lib/modules/stmvl53l1.ko
+   insmod /vendor/lib/modules/qpnp-smbcharger-mmi.ko
+   insmod /vendor/lib/modules/tas2562.ko
+
+on init
+   # Change ownership for for HBM feature
+   chown system system /sys/class/graphics/fb0/hbm
+   # Change ownership for for ACL feature
+   chown system system /sys/class/graphics/fb0/acl
+
+on boot
+   # change permission for capsensor
+   chown system system /sys/class/capsense/reset
+
+   # Change the ownership of display TE files for tcmds
+   chown root vendor_tcmd /sys/class/graphics/fb0/te_test
+   chown root vendor_tcmd /sys/class/graphics/fb0/te_enable
+   chown root vendor_tcmd /sys/class/graphics/fb0/frame_counter
+   chown root vendor_tcmd /d/dsi_smd_639_1080x2340_cmd_display/esd_check_mode
+   chown root vendor_tcmd /d/dsi_tianma_639_1080x2340_cmd_display/esd_check_mode
+   chmod 0664 /d/dsi_tianma_639_1080x2340_cmd_display/esd_check_mode
+   chmod 0664 /d/dsi_smd_639_1080x2340_cmd_display/esd_check_mode
+
+   # in FBE mode, /data is here
+   write /sys/block/sdb/queue/read_ahead_kb 512
+
+   # Change ownership and permission for vibrator
+   chown system system /sys/class/leds/vibrator/state
+   chown system system /sys/class/leds/vibrator/duration
+   chown system system /sys/class/leds/vibrator/activate
+   chown system system /sys/class/leds/vibrator/extra
+   chown system system /sys/class/leds/vibrator/seq
+   chown system system /sys/class/leds/vibrator/reduce
+   chmod 0660 /sys/class/leds/vibrator/state
+   chmod 0660 /sys/class/leds/vibrator/duration
+   chmod 0660 /sys/class/leds/vibrator/activate
+   chmod 0660 /sys/class/leds/vibrator/extra
+   chmod 0660 /sys/class/leds/vibrator/seq
+   chmod 0660 /sys/class/leds/vibrator/reduce
+
+   # Change group for himax TP factory testing
+   chown root vendor_tcmd /proc/android_touch/self_test
+
+   # Add for goodix fingerprint
+   chown system system /dev/goodix_fp
+   chmod 0664 /dev/goodix_fp
+   mkdir /data/vendor/gf_data 0770 system system
+   mkdir /mnt/vendor/persist/goodix 0770 system system
+   chown system system /d/dsi_smd_639_1080x2340_cmd_display/panel_hbm
+   chown system system /d/dsi_tianma_639_1080x2340_cmd_display/panel_hbm
+   chown system system /sys/class/backlight/panel0-backlight/brightness
+
+   #Add for camera flashlight
+   chown system system /sys/class/leds/led:flash_0/brightness
+   chown system system /sys/class/leds/led:torch_0/brightness
+   chown system system /sys/class/leds/led:switch_0/brightness
+   chmod 0664 /sys/class/leds/led:flash_0/brightness
+   chmod 0664 /sys/class/leds/led:torch_0/brightness
+   chmod 0664 /sys/class/leds/led:switch_0/brightness
+
+   # Change ownership and permission for AMPS factory testing
+   chown root vendor_tcmd /sys/devices/platform/soc/a600000.ssusb/modusb_enable
+   chown root vendor_tcmd /sys/devices/platform/soc/a600000.ssusb/modusb_protocol
+
+
+service vendor.mmi-laser-sh /vendor/bin/init.mmi.laser.sh
+    class core
+    user root
+    oneshot
+
+service vendor.vl53l1_daemon /vendor/bin/vl53l1_daemon
+    class late_start
+    user root
+    group root
+    socket vl53l1_daemon stream 660 root system
+
+on property:ro.build.type=userdebug
+    insmod /vendor/lib/modules/watchdogtest.ko
+
+# Turn on led to indicate device on in factory mode
+on property:ro.bootmode=factory
+    write /sys/class/leds/charging/brightness 255
+
+on property:ro.bootmode=mot-factory
+    write /sys/class/leds/charging/brightness 255
+
+# Set hub drive strength to +15%
+on property:ro.bootmode=normal
+    write /sys/module/usb3813_hub/parameters/boost_val 5
+on property:ro.bootmode=mot-factory
+    write /sys/module/usb3813_hub/parameters/boost_val 5
+
+on property:ro.vendor.hw.ram=*
+   setprop ro.hardware.device.ram_size ${ro.vendor.hw.ram}
+
